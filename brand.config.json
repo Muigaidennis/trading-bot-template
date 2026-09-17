@@ -1,6 +1,6 @@
 {
   "brand_name": "Manoo FX",
-  "brand_domain": "manoo-fx.vercel.app",
+  "brand_domain": "trading-bot-template-ten.vercel.app",
   "domain_name": "Manoo FX",
   "colors": {
     "primary": "#00D4AA",
@@ -42,10 +42,10 @@
     },
     "hostname": {
       "production": {
-        "com": "manoo-fx.vercel.app"
+        "com": "trading-bot-template-ten.vercel.app"
       },
       "staging": {
-        "com": "manoo-fx.vercel.app"
+        "com": "trading-bot-template-ten.vercel.app"
       }
     },
     "auth2_url": {
