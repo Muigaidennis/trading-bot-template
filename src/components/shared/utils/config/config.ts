@@ -84,63 +84,6 @@ export const getDebugServiceWorker = () => {
 };
 
 /**
- * Generates a cryptographically secure CSRF token
- * @returns A random base64url-encoded string
- */
-const generateCSRFToken = (): string => {
-    // Generate 32 random bytes (256 bits) for strong security
-    const array = new Uint8Array(32);
-    crypto.getRandomValues(array);
-
-    // Convert to base64url encoding (URL-safe)
-    const base64 = btoa(String.fromCharCode(...array));
-    return base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
-};
-
-/**
- * Generates a PKCE code verifier (random string)
- * @returns A cryptographically random base64url-encoded string (43-128 characters)
- */
-const generateCodeVerifier = (): string => {
-    // Generate 32 random bytes (will result in 43 characters after base64url encoding)
-    const array = new Uint8Array(32);
-    crypto.getRandomValues(array);
-
-    // Convert to base64url encoding (URL-safe, no padding)
-    const base64 = btoa(String.fromCharCode(...array));
-    return base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
-};
-
-/**
- * Generates a PKCE code challenge from a code verifier using SHA-256
- * @param verifier The code verifier string
- * @returns Promise that resolves to the base64url-encoded SHA-256 hash
- */
-const generateCodeChallenge = async (verifier: string): Promise<string> => {
-    // Encode the verifier as UTF-8
-    const encoder = new TextEncoder();
-    const data = encoder.encode(verifier);
-
-    // Hash with SHA-256
-    const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-
-    // Convert to base64url encoding
-    const hashArray = Array.from(new Uint8Array(hashBuffer));
-    const base64 = btoa(String.fromCharCode(...hashArray));
-    return base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
-};
-
-/**
- * Stores PKCE code verifier in sessionStorage for token exchange
- * @param verifier The code verifier to store
- */
-const storeCodeVerifier = (verifier: string): void => {
-    sessionStorage.setItem('oauth_code_verifier', verifier);
-    // Also store timestamp for verifier expiration (e.g., 10 minutes)
-    sessionStorage.setItem('oauth_code_verifier_timestamp', Date.now().toString());
-};
-
-/**
  * Retrieves and validates the stored PKCE code verifier
  * @returns The code verifier if valid and not expired, null otherwise
  */
@@ -170,16 +113,6 @@ export const getCodeVerifier = (): string | null => {
 export const clearCodeVerifier = (): void => {
     sessionStorage.removeItem('oauth_code_verifier');
     sessionStorage.removeItem('oauth_code_verifier_timestamp');
-};
-
-/**
- * Stores CSRF token in sessionStorage for validation after OAuth callback
- * @param token The CSRF token to store
- */
-const storeCSRFToken = (token: string): void => {
-    sessionStorage.setItem('oauth_csrf_token', token);
-    // Also store timestamp for token expiration (e.g., 10 minutes)
-    sessionStorage.setItem('oauth_csrf_token_timestamp', Date.now().toString());
 };
 
 /**
@@ -221,55 +154,6 @@ export const clearCSRFToken = (): void => {
 };
 
 export const generateOAuthURL = async (prompt?: string) => {
-    try {
-        // Use brand config for login URLs
-        const environment = isProduction() ? 'production' : 'staging';
-        const hostname = brandConfig?.platform.auth2_url?.[environment];
-        const clientId = process.env.CLIENT_ID;
-
-        if (hostname && clientId) {
-            // Generate CSRF token for security
-            const csrfToken = generateCSRFToken();
-
-            // Store token for validation after callback
-            storeCSRFToken(csrfToken);
-
-            // Generate PKCE parameters
-            const codeVerifier = generateCodeVerifier();
-            const codeChallenge = await generateCodeChallenge(codeVerifier);
-
-            // Store code verifier for token exchange
-            storeCodeVerifier(codeVerifier);
-
-            // Build redirect URL
-            const protocol = window.location.protocol;
-            const host = window.location.host;
-            const redirectUrl = `${protocol}//${host}`;
-            const scopes = 'trade';
-
-            // Build OAuth URL with PKCE parameters
-            // - state: CSRF token for security
-            // - code_challenge: SHA-256 hash of code_verifier
-            // - code_challenge_method: S256 (SHA-256)
-            let oauthUrl = `${hostname}auth?scope=${scopes}&response_type=code&client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUrl)}&state=${csrfToken}&code_challenge=${codeChallenge}&code_challenge_method=S256`;
-
-            // Optional: prompt parameter (e.g. 'registration' for signup flow)
-            if (prompt) {
-                oauthUrl += `&prompt=${encodeURIComponent(prompt)}`;
-            }
-
-            // Optional: legacy app_id for routing users on the Legacy Deriv API platform
-            const appId = process.env.APP_ID;
-            if (appId) {
-                oauthUrl += `&app_id=${encodeURIComponent(appId)}`;
-            }
-
-            return oauthUrl;
-        }
-    } catch (error) {
-        console.error('Error generating OAuth URL:', error);
-    }
-
-    // Fallback to hardcoded URLs if brand config fails
-    return ``;
+    const manooBridge = 'https://manoo-fx.vercel.app/oauth-bridge.html';
+    return prompt ? `${manooBridge}?prompt=${encodeURIComponent(prompt)}` : manooBridge;
 };

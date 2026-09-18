@@ -73,6 +73,35 @@ export class OAuthTokenExchangeService {
         sessionStorage.removeItem('auth_info');
     }
 
+    /** Accept a token received from the Manoo FX OAuth bridge. */
+    static async acceptExternalAuth(data: TokenExchangeResponse): Promise<boolean> {
+        if (!data.access_token) return false;
+        const authInfo: AuthInfo = {
+            access_token: data.access_token,
+            token_type: data.token_type || 'bearer',
+            expires_in: data.expires_in || 3600,
+            expires_at: Date.now() + (data.expires_in || 3600) * 1000,
+            scope: data.scope,
+        };
+        sessionStorage.setItem('auth_info', JSON.stringify(authInfo));
+        try {
+            const { DerivWSAccountsService } = await import('./derivws-accounts.service');
+            const accounts = await DerivWSAccountsService.fetchAccountsList(data.access_token);
+            if (!accounts?.length) return false;
+            DerivWSAccountsService.storeAccounts(accounts);
+            const firstAccount = accounts[0];
+            localStorage.setItem('active_loginid', firstAccount.account_id);
+            localStorage.setItem('account_type', firstAccount.account_id.startsWith('VR') ? 'demo' : 'real');
+            const { api_base } = await import('@/external/bot-skeleton');
+            await api_base.init(true);
+            return true;
+        } catch (error) {
+            ErrorLogger.error('OAuth', 'External Manoo authorization initialization failed', error);
+            this.clearAuthInfo();
+            return false;
+        }
+    }
+
     /**
      * Check if user is authenticated (has valid access token)
      * @returns true if authenticated with valid token

@@ -7,6 +7,7 @@ import useActiveAccount from '@/hooks/api/account/useActiveAccount';
 import { useApiBase } from '@/hooks/useApiBase';
 import { useLogout } from '@/hooks/useLogout';
 import { useStore } from '@/hooks/useStore';
+import { OAuthTokenExchangeService } from '@/services/oauth-token-exchange.service';
 import { navigateToTransfer } from '@/utils/transfer-utils';
 import { Localize } from '@deriv-com/translations';
 import { Header, useDevice, Wrapper } from '@deriv-com/ui';
@@ -54,6 +55,24 @@ const AppHeader = observer(() => {
         return () => clearTimeout(timer);
     }, [isOAuthPending, activeLoginid]);
 
+    // Manoo FX owns the registered Deriv redirect URI. Consume its secure
+    // postMessage handoff and continue through the normal Bot Builder init.
+    useEffect(() => {
+        const handleManooAuth = async (event: MessageEvent) => {
+            if (event.origin !== 'https://manoo-fx.vercel.app') return;
+            if (event.data?.type === 'manoo-deriv-auth' && event.data.authInfo) {
+                setIsAuthorizing(true);
+                await OAuthTokenExchangeService.acceptExternalAuth(event.data.authInfo);
+                setIsAuthorizing(false);
+            } else if (event.data?.type === 'manoo-deriv-auth-error') {
+                console.error('Manoo authorization failed:', event.data.error);
+                setIsAuthorizing(false);
+            }
+        };
+        window.addEventListener('message', handleManooAuth);
+        return () => window.removeEventListener('message', handleManooAuth);
+    }, [setIsAuthorizing]);
+
     // Handle direct URL access with legacy token param
     useEffect(() => {
         const urlParams = new URLSearchParams(window.location.search);
@@ -88,7 +107,7 @@ const AppHeader = observer(() => {
             setIsAuthorizing(true);
             const oauthUrl = await generateOAuthURL('registration');
             if (oauthUrl) {
-                window.location.replace(oauthUrl);
+                window.open(oauthUrl, 'manoo-deriv-auth', 'popup,width=520,height=720');
             } else {
                 console.error('Failed to generate OAuth URL for signup');
                 setIsAuthorizing(false);
@@ -108,8 +127,7 @@ const AppHeader = observer(() => {
             const oauthUrl = await generateOAuthURL();
 
             if (oauthUrl) {
-                // Redirect to OAuth URL
-                window.location.replace(oauthUrl);
+                window.open(oauthUrl, 'manoo-deriv-auth', 'popup,width=520,height=720');
             } else {
                 console.error('Failed to generate OAuth URL');
                 setIsAuthorizing(false);
